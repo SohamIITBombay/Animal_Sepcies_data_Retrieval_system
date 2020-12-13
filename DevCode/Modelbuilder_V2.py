@@ -19,14 +19,31 @@ from typing import Union, Optional, Type, Any, List, Callable
 Model_names = ['resnet18', 'resnet50', 'resnet101', 'resnet152']
 
 class ModelNotFoundError(RuntimeError):
+    """
+    A class for custom Error. Raises ModelNotFoundError if
+    the model name entered does not belong to supported models.
+
+    """
     def __init__(self, arg):
         self.args = arg
 
 class DataNotArrangedError(RuntimeError):
+    """
+    A class for custom Error. Raises DataNotArrangedError if
+    the Data is not arranged in a manner required for torchvision's
+    ImageFolder Moduel.
+
+    """
     def __init__(self, arg):
         self.args = arg
 
 class FeaturesNotProvidedError(RuntimeError):
+    """
+    A class for custom Error. Raises FeaturesNotProvidedError if
+    the user specifies number of FC layers more than one but does 
+    not give the number of hidden units for that extra layer.
+
+    """
     def __init__(self, arg):
         self.args = arg
 
@@ -37,6 +54,23 @@ class Classifier():
     def __init__(self, exp_no: int, model_to_train: str, dataset_dir: str, 
                 performance_dir: str, gpu: Optional[bool] = None):
 
+        """
+        Initialization of a class Classifier.
+
+        Args:
+        exp_no (int): Current experiment number so as to locate the current 
+                    experiment's file.
+        model_to_train (str): name of the pretrained model to train
+        dataset directory (str): Directory containing the data
+        performance directory (str): The directory where the generated text, checkpoints
+                                    model_stats will be saved.
+        gpu (bool): Boolean indicating availability of a GPU
+
+        Returns:
+        None.
+
+        """
+                    
         self.exp_no = exp_no
 
         if model_to_train not in Model_names:
@@ -72,6 +106,19 @@ class Classifier():
 
     def load_data(self, batch_size: int = 128, valid_size: float = 0.2, 
                 num_workers: int = 1) -> None:
+
+        """
+        A Method for Loading the data from the given dataset directory.
+
+        Args:
+        batch_size (int): Batch size for loading images
+        valid_size (float): Percentage of the training data to be used for validation
+        num_workers (int): Specified for parallel loading of the data using an idle CPU core
+
+        Returns:
+        None.
+
+        """
 
         # Defining means and standard deviations for RGB channels as 
         # required by Pre-trained models
@@ -150,6 +197,22 @@ class Classifier():
     def load_model(self, freeze_conv_layers: Optional[bool] = None, 
                 num_FCL: Optional[int] = 1, 
                 features: Optional[List] = None) -> None:
+        """
+        A Method for imporing the model from the torchvision's 
+        pretrained models.
+
+        Args:
+        freeze_conv_layers (bool): A boolean specifying whether to train all the layers or 
+                                    freeze them and modify only last FC layers
+        num_FCL (int): Number of fully connected layers attached to the end of the 
+                        convolutional blocks
+        features (list): If number of fully connected layers in more than 1, features list gives 
+                    the number of hidden units desired in the extra fully connected layers.
+
+        Returns:
+        None.
+
+        """
 
         if self.Model_name == 'resnet18':
             self.TempNetwork = models.resnet18(pretrained=True)
@@ -223,6 +286,32 @@ class Classifier():
                         step_size: int = 30, 
                         gamma: float = 0.1) -> None:
 
+        """
+        A Method for setting up the optimization parameters like learning rate. Also 
+        sets up Learning rate scheduler parameters like factor, threshold, patience etc.
+
+        Args:
+        optimizer (str): The name of the optimizer. Choose between ('adam', 'SGD')
+        scheduler (str): The name of the scheduler. Choose between ('StepLR', 'reduceOnPlateau')
+        learning_rate (float): Starting learning rate to use (will be changed by lR scheduler 
+                            as required)
+        factor (float): A factor to multiply learning_rate with so as to reduce it after validation
+                        loss stops decreasing.
+        threshold (float): Indicates the threshold for difference between previous epoch
+                        validation loss and the current below which the factor will be multiplied
+                        to the learning_rate
+        patience (int): number of epochs to wait before reducing the learning rate. (Sometimes
+                        the validation loss will decrease even after increasing for a prev epoch)
+        step_size (int): number of epochs after which the learning rate will be multiplied by 
+                        gamma. (Used only for StepLR scheduler)
+        gamma (float): Factor to multiply learning_rate with so as to reduce it after 'step_size' 
+                        number of epochs.
+
+        Returns:
+        None.
+
+        """
+
         # Saving Learning rate. This is the initial learning rate
         self.lr = learning_rate
         self.write_data(['Optimizer name: ' + optimizer_name, 
@@ -287,6 +376,26 @@ class Classifier():
             load_prev: Optional[str] = None, 
             valid_loss: Optional[float] = None) -> None:
         
+        """
+        A method for beginning Training the model. Either starts training from beginning,
+        or from a pervious checkpoint or from a custom checkpoint.
+
+        Args:
+        n_epochs (int): Number of epochs to train the model
+        custom_path (str): Path of the custom checkpoint desired to be loaded. 
+                        The hyperparameters for this checkpoint will be read from 
+                        the correspoiding Text file.
+        load_prev (str): Path of the checkpoint desired to be loaded. The hyperparameters 
+                        for this checkpoint will be read from the correspoiding Text file.
+        valid_loss (float): Minimum valid loss that was attained during previous training. 
+                        Required for comparison with the valid loss of the new experiment's 
+                        first epoch so as to decide whether there was an improvement.
+
+        Returns:
+        None.
+
+        """
+
         # Creating directories
         model_stats_dir = self.Performance_dir + '\\Model_Stats\\exp_' + str(self.exp_no)
         checkpoint_dir = self.Performance_dir + '\\Checkpoints'
@@ -575,6 +684,27 @@ class Classifier():
     def write_data(self, lines: Union[str, List], exp_no: int, 
                 continuing: bool = False, replace: bool = False):
 
+        """
+        A method for writing the data to a text file. The method is called
+        at places where the data needs to be written to the file.
+
+        Args:
+        lines Union[str, List]: Line of lines to be written to the text file
+        exp_no (int): Current experiment number so as to locate the current 
+                    experiment's file.
+        continuing (bool): A boolean specifying whether to add the dashed lines 
+                        for easy organization. Should be False if the data to be 
+                        written belongs to a particular category.
+        replace (bool): A boolean specifying whether to replace the older version
+                        of a line with a newer version that is automatically detected.
+                        Used for replacing the Minimum valid loss entries once a better
+                        valid loss is reached.
+        
+        Returns:
+        None.
+
+        """
+
         Experiment_info_dir = self.Performance_dir + '\\Exp_data'
         if not os.path.isdir(Experiment_info_dir):
             os.makedirs(Experiment_info_dir)
@@ -610,6 +740,20 @@ class Classifier():
 
 
     def delete_file(self, exp_no: int, stats_delete=True):
+
+        """
+        A method to delete the generated files if the program runs into an error.
+
+        Args:
+        exp_no (int): Current experiment number so as to locate the current 
+                    experiment's file.
+        stats_delete (bool): A boolean specifying whether to delete the stats file
+                            generated by tensorboard summarywriter.
+        
+        Returns:
+        None.
+
+        """
 
         Experiment_info_dir = self.Performance_dir + '\\Exp_data'
         model_stats_dir = self.Performance_dir + '\\Model_Stats\\exp_' + str(exp_no)

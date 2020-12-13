@@ -79,7 +79,7 @@ def get_latest_cp(performance_directory: str):
 
 
 
-def get_valid_loss(checkpoint, performance_directory, Model):
+def get_valid_loss(checkpoint, performance_directory: str, Model):
     
     """
     A function for reading the minimum valid loss from the text file obtained 
@@ -118,7 +118,7 @@ def get_valid_loss(checkpoint, performance_directory, Model):
 
 
 
-def get_hyperparameters(checkpoint, performance_directory, Model):
+def get_hyperparameters(checkpoint, performance_directory: str, Model):
     
     """
     A Function for reading hyperparameters like learning rate, factor, patience 
@@ -240,8 +240,8 @@ def load_data(Model, num_fcl: int = 1, features: Optional[List] = None) -> None:
 
 
 
-def setup_opt(Model, optimizer: str, scheduler: str, performance_directory: str, 
-                custom_optim_setup: bool = False, checkpoint: Optional[str] = None) -> None:
+def setup_opt(Model, optimizer: str, scheduler: str, custom_optim_setup: bool = False, 
+                checkpoint: Optional[str] = None) -> None:
 
     """
     A function for setting up the optimization parameters like learning rate. Also 
@@ -261,6 +261,7 @@ def setup_opt(Model, optimizer: str, scheduler: str, performance_directory: str,
 
     """
 
+    performance_directory = Model.Performance_dir
     if custom_optim_setup:
         lr = round(float(input("Enter Learning rate:\n>>>>")), 3)
         f = round(float(input("Enter the Factor for reduceOnPlateau scheduler \
@@ -285,8 +286,7 @@ def setup_opt(Model, optimizer: str, scheduler: str, performance_directory: str,
 
 def train(Model, 
         optimizer: str, 
-        scheduler: str, 
-        performance_directory: str, 
+        scheduler: str,  
         n_epochs: int = 30, 
         custom_path_bool: bool = False, 
         load_from_checkpoint: bool = False, 
@@ -312,6 +312,7 @@ def train(Model,
 
     """
 
+    performance_directory = Model.Performance_dir
     if custom_path_bool and load_from_checkpoint:
         delete_file(Model, stats_delete=False)
         raise RuntimeError("load_prev should be False when Custom path is given and Vice Versa.")
@@ -326,8 +327,7 @@ def train(Model,
         latest_checkpoint = get_latest_cp(performance_directory)
         if latest_checkpoint is not None:
             valid_loss = get_valid_loss(latest_checkpoint, performance_directory, Model)
-            setup_opt(Model, optimizer, scheduler, performance_directory, 
-                    custom_optim_setup, latest_checkpoint)
+            setup_opt(Model, optimizer, scheduler, custom_optim_setup, latest_checkpoint)
         else:
             delete_file(Model, stats_delete=False)
             raise FileNotFoundError("A checkpoint file exptected \
@@ -347,8 +347,7 @@ def train(Model,
             raise FileNotFoundError("Custom Checkpoint entered not found: " + custom_path)
            
         
-        setup_opt(Model, optimizer, scheduler, performance_directory, 
-                custom_optim_setup, custom_path)
+        setup_opt(Model, optimizer, scheduler, custom_optim_setup, custom_path)
                 
         valid_loss = get_valid_loss(custom_path, performance_directory, Model)
         checkpoint = None
@@ -356,9 +355,66 @@ def train(Model,
     else:
         checkpoint = None
         valid_loss = None
-        setup_opt(Model, optimizer, scheduler, performance_directory, custom_optim_setup=True)
+        setup_opt(Model, optimizer, scheduler, custom_optim_setup=True)
 
     Model.train(n_epochs, custom_path, load_prev=checkpoint, valid_loss=valid_loss)
+
+
+
+def classification_histogram(Model, visualize_histogram_plot: bool = False):
+
+    """
+    A function for creating a figure which consists of an image and the
+    predicted class is the form of a histogram.
+
+    Args:
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+    visualize_histogram_plot (bool): A boolean specifying whether to execute plotting histogram
+
+    Returns:
+    None.
+
+    """
+
+    if visualize_histogram_plot == True:
+        Model.visualize_histogram()
+
+
+def plot_image_class(Model, visualize_image_and_class: bool = False):
+
+    """
+    A function for creating a figure in which images will be plotted in subplots
+        with their title representing the class that image belongs to.
+
+    Args:
+    visualize_image_and_class (bool): A boolean specifying whether to execute plotting
+
+    Returns:
+    None.
+
+    """
+
+    if visualize_image_and_class:
+        Model.plot_image_class()
+
+
+
+def save(Model, wish_to_save: bool = False):
+    
+    """
+    A function for saving the whole model to be used for inference ahead.
+
+    Args:
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+    wish_to_save (bool): A boolean specifying whether to save the model
+
+    Returns:
+    None.
+
+    """
+
+    if wish_to_save:
+        Model.save_model(wish_to_save)
 
 
 
@@ -396,9 +452,9 @@ if __name__ == "__main__":
     features_in_fc_layers = [128]
     optimizer = 'SGD'
     scheduler = 'reduceOnPlateau'
-    want_to_visualize = False
-    class_histogram_plot = False
-    wish_to_save = True
+    visualize_image_and_class = False
+    visualize_histogram_plot = False
+    wish_to_save = False
     dataset_dir = 'C:\\Users\\soham\\Desktop\\ME781_project\\Code\\Animal_dataV2'
     performance_directory = 'C:\\Users\\soham\\Desktop\\ME781_project\\Summary'
 
@@ -408,5 +464,10 @@ if __name__ == "__main__":
     classifier = instantiate_model(Model_to_train, dataset_dir, performance_directory, gpu=gpu)
     load_data(classifier, num_fcl, features_in_fc_layers)
 
-    train(classifier, optimizer, scheduler, performance_directory, Num_epochs, 
-        custom_path_bool, load_from_checkpoint, custom_optim_setup)
+    train(classifier, optimizer, scheduler, Num_epochs, custom_path_bool, 
+        load_from_checkpoint, custom_optim_setup)
+
+    classification_histogram(classifier, visualize_histogram_plot)
+    plot_image_class(classifier, visualize_image_and_class)
+    save(classifier, wish_to_save)
+

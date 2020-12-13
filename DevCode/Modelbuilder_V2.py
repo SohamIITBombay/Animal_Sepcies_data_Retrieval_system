@@ -104,6 +104,7 @@ class Classifier():
                         self.exp_no, continuing=True)
 
 
+
     def load_data(self, batch_size: int = 128, valid_size: float = 0.2, 
                 num_workers: int = 1) -> None:
 
@@ -194,6 +195,7 @@ class Classifier():
                         self.exp_no, continuing=True)
 
 
+
     def load_model(self, freeze_conv_layers: Optional[bool] = None, 
                 num_FCL: Optional[int] = 1, 
                 features: Optional[List] = None) -> None:
@@ -274,7 +276,8 @@ class Classifier():
             self.Network.fc = nn.Linear(in_features, len(self.classes))
 
         self.Network.to(self.device)
-        #print(self.Network)  
+
+
 
     def setup_optimization(self, 
                         optimizer_name: str = 'SGD', 
@@ -367,8 +370,6 @@ class Classifier():
         self.criterion = nn.CrossEntropyLoss()
 
         
-
-
 
     def train(self, 
             n_epochs: int = 30, 
@@ -681,6 +682,7 @@ class Classifier():
                 self.delete_file(self.exp_no)
 
 
+
     def write_data(self, lines: Union[str, List], exp_no: int, 
                 continuing: bool = False, replace: bool = False):
 
@@ -739,6 +741,7 @@ class Classifier():
             tw.close()
 
 
+
     def delete_file(self, exp_no: int, stats_delete=True):
 
         """
@@ -770,3 +773,207 @@ class Classifier():
             if re.search('_' + str(exp_no), file):
                 os.remove(file)
         
+
+    def un_normalize(self, img):
+
+        """
+        A method to perform reverse normalization so as to plot the image
+        for visualization and presentation.
+
+        Args:
+        img (torch.Tensor): Image upon which to perform reverse normalization
+
+        Returns:
+        None.
+
+        """
+            
+        means = [0.485, 0.456, 0.406]
+        stdevs = [0.229, 0.224, 0.225]
+        
+        means, stdevs = np.array(means), np.array(stdevs)
+
+        # Reversing Normalization that was done previously
+        means = list(means*-1)
+        stdevs = list(1/stdevs)
+
+        transform = transforms.Normalize(means, stdevs)
+        img = transform(img)
+        return img
+
+
+
+    def visualize_histogram(self):
+
+        """
+        A method for creating a figure which consists of an image and the
+        predicted class is the form of a histogram.
+
+        Args:
+        None.
+
+        Returns:
+        None.
+        
+        """
+
+        dataiter = iter(self.testloader)
+        i = 0
+        
+        while True:
+            
+            i += 1
+            
+            images, _ = dataiter.next()
+            image = images[0].view(1, 3, 224, 224)
+            images.numpy()
+            image_to_view = self.un_normalize(images[0])
+
+
+            image = image.to(self.device)
+
+            output = self.Network(image)
+            ps = F.softmax(output, dim=1)
+
+            self.view_classify(i, image_to_view, ps)
+            user_prompt = input('Hit Enter to load next image! Press q to quit')
+            if user_prompt == 'q':
+                break
+
+
+
+    def view_classify(self, i, img, ps):
+        
+        """
+        A method that assists 'classification_histogram()'
+         for viewing an image and it's predicted classes.
+         
+         Args:
+         i (int): Image number
+         img (torch.Tensor): image to use in figure
+         ps (torch.Tensor): probability of image class
+         
+         Returns:
+         None.
+         
+         """
+
+        if self.device == 'cuda':
+            ps = ps.data.cpu().numpy().squeeze()
+        else:
+            ps = ps.data.numpy().squeeze()
+
+        fig, (ax1, ax2) = plt.subplots(figsize=(6,9), ncols=2)
+        img = np.transpose(img, (1, 2, 0))
+        ax1.imshow(img)
+        ax1.axis('off')
+        ax2.barh(np.arange(len(self.classes)), ps)
+        ax2.set_aspect(0.1)
+        ax2.set_yticks(np.arange(len(self.classes)))
+        ax2.set_yticklabels(self.classes, size='small');
+        ax2.set_title('Class Probability')
+        ax2.set_xlim(0, 1.1)
+
+        plt.tight_layout()
+        name = 'hist' + str(i) + '.png'
+        path_name = self.Performance_dir + '\\histogram'
+
+        if not os.path.isdir(path_name):
+            os.makedirs(path_name)
+        plt.savefig(path_name + '\\' + name)
+        plt.show()
+
+
+
+    def imshow(self, img):
+
+        """
+        A method to show image after performing reverse normalization.
+
+        Args:
+        img (torch.Tensor): Image on which to be performed reverse normalization
+
+        Returns:
+        None.
+
+        """
+        
+        img = self.un_normalize(img)
+
+        # In Pytorch, dimensions are (C, W, H) but in matplotlib - (W, H, C)
+        plt.imshow(np.transpose(img, (1, 2, 0)))
+
+
+
+    def plot_image_class(self, subplot_rows: int = 5, 
+                        subplot_cols: int = 4):
+        
+        """
+        A method for creating a figure in which images will be plotted in subplots
+        with their title representing the class that image belongs to.
+
+        Args:
+        subplot_rows (int): Number of rows of images in subplots
+        subplot_cols (int): Number of columns of images in subplots
+
+        Returns:
+        None.
+        
+        """
+
+        figWidth = subplot_cols*4
+        figHeight = subplot_rows*4
+        
+        dataiter = iter(self.testloader)
+        images, labels = dataiter.next()
+
+        #Want only num_images for visualization. No need of full batch
+        num_images = subplot_cols*subplot_rows
+        images = images[:num_images]
+        images = images.view(num_images, 3, 224, 224)
+
+
+        images, labels = images.to(self.device), labels.to(self.device)
+            
+        output = self.Network(images)
+
+        _, preds_tensor = torch.max(output, 1)
+        preds = np.squeeze(preds_tensor.numpy()) if not self.device == 'cuda' else np.squeeze(preds_tensor.cpu().numpy())
+
+        fig = plt.figure(figsize=(figWidth, figHeight))
+        for idx in range(num_images):
+            ax = fig.add_subplot(subplot_rows, subplot_cols, idx+1, xticks=[], yticks=[])
+            self.imshow(images.cpu()[idx])
+            ax.set_title("{} ({})".format(self.classes[preds[idx]], self.classes[labels[idx]]),
+                        color=("green" if preds[idx] == labels[idx].item() else "red"), 
+                        fontsize=11)
+        
+        
+        img_name = 'image_class' + str(self.exp_no) + '.png'        
+        path_name = self.Performance_dir + '\\Image_and_class'
+
+        if not os.path.isdir(path_name):
+            os.makedirs(path_name)
+        plt.savefig(path_name + '\\' + img_name)
+        plt.show()
+
+
+
+    def save_model(self, save=False):
+
+        """
+        A method to save the whole model to be used for inference ahead.
+
+        Args:
+        save (bool): A boolean specifying whether to save the whole model
+
+        Returns:
+        None.
+
+        """
+
+        if save:
+            path_name = self.Performance_dir + '\\' + 'whole_model'
+            if not os.path.isdir(path_name):
+                os.makedirs(path_name)
+            torch.save(self.Network, path_name + '\\Complete_model_' + str(self.exp_no) + '.pth')

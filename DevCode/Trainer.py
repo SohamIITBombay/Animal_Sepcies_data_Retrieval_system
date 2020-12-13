@@ -3,17 +3,46 @@ import torch.nn as nn
 import os, glob, re
 from Modelbuilder_V2 import Classifier
 from typing import Union, Optional, List, Type, Any, Dict
+import argparse
+
 
 
 def get_gpu_status() -> bool:
+    
+    """
+    A function for Getting the available device
+    between cuda or cpu
+
+    Args:
+    None.
+
+    Returns:
+    None.
+
+    """
+
     if torch.cuda.is_available():
         gpu = True
     else:
         gpu = None
     return gpu
 
-# Functions for reading the data written during previous experiment
+
+
 def get_latest_exp(performance_directory: str):
+    
+    """
+    Function for get the Text file of the latest 
+    experiment performed.
+
+    Args:
+    performance directory (str): The directory where the generated text, checkpoints
+                                model_stats will be saved.
+
+    Returns:
+    None.
+
+    """
 
     if not glob.glob(performance_directory + '\\Exp_data\\*.txt') == []:
         latest_file = max(glob.glob(performance_directory + \
@@ -23,7 +52,22 @@ def get_latest_exp(performance_directory: str):
     else:
         return None
 
+
+
 def get_latest_cp(performance_directory: str):
+    
+    """
+    Function for getting the latest checkpoint file for the latest 
+    experiment performed.
+
+    Args:
+    performance directory (str): The directory where the generated text, checkpoints
+                                model_stats will be saved.
+
+    Returns:
+    None.
+
+    """
 
     if not glob.glob(performance_directory + '\\Checkpoints\\*.pth') == []:
         latest_cp = max(glob.glob(performance_directory + \
@@ -33,7 +77,25 @@ def get_latest_cp(performance_directory: str):
     else:
         return None
 
+
+
 def get_valid_loss(checkpoint, performance_directory, Model):
+    
+    """
+    A function for reading the minimum valid loss from the text file obtained 
+    during a previous experiment (to compare during current experiment).
+
+    Args:
+    checkpoint (str):Path of the checkpoint desired to be loaded. The hyperparameters for this
+                        checkpoint will be read from the correspoiding Text file.
+    performance directory (str): The directory where the generated text, checkpoints
+                                model_stats will be saved.
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+
+    Returns:
+    None.
+
+    """
 
     name = (re.findall('\\\\([^\\\\]+)\.pth', checkpoint))[0]
     exp_no = (re.findall('_([0-9]+)', name))[0]
@@ -54,7 +116,26 @@ def get_valid_loss(checkpoint, performance_directory, Model):
 
     return valid_loss
 
+
+
 def get_hyperparameters(checkpoint, performance_directory, Model):
+    
+    """
+    A Function for reading hyperparameters like learning rate, factor, patience 
+    pertaining to the optimizer and learning rate scheduler. Reads from a text 
+    file generated during a previous experiment.
+
+    Args:
+    checkpoint (str):Path of the checkpoint desired to be loaded. The hyperparameters for this
+                        checkpoint will be read from the correspoiding Text file.
+    performance directory (str): The directory where the generated text, checkpoints
+                                model_stats will be saved.
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+
+    Returns:
+    None.
+
+    """
 
     name = (re.findall('\\\\([^\\\\]+)\.pth', checkpoint))[0]
     exp_no = (re.findall('_([0-9]+)', name))[0]
@@ -102,11 +183,26 @@ def get_hyperparameters(checkpoint, performance_directory, Model):
 
 
 
-# Instantiate the model
 def instantiate_model(model_to_train: str, 
                     dataset_directory: str, 
                     performance_directory: str, 
                     gpu: Optional[bool] = None):
+
+    """
+    A function to create the instance of the imported Class,
+    Classifier.
+
+    Args:
+    model_to_train (str): name of the pretrained model to train
+    dataset directory (str): Directory containing the data
+    performance directory (str): The directory where the generated text, checkpoints
+                                model_stats will be saved.
+    gpu (bool): Boolean indicating availability of a GPU
+
+    Returns:
+    None.
+
+    """
 
     file = get_latest_exp(performance_directory)
     if file is not None:
@@ -120,16 +216,51 @@ def instantiate_model(model_to_train: str,
     return Model
 
 
-# Loads the data and Imports model
+
 def load_data(Model, num_fcl: int = 1, features: Optional[List] = None) -> None:
+
+    """
+    A function to load the data from the Dataset Directory provided to the 
+    'instantiate_model()' function.
+
+    Args:
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+    num_FCL (int): Number of fully connected layers attached to the end of the 
+                    convolutional blocks
+    features (list): If number of fully connected layers in more than 1, features list gives 
+                    the number of hidden units desired in the extra fully connected layers.
+
+    Returns:
+    None.
+
+    """
 
     Model.load_data(num_workers=1)
     Model.load_model(freeze_conv_layers=True, num_FCL=num_fcl, features=features)
 
 
-# Sets up optimizer and scheduler
+
 def setup_opt(Model, optimizer: str, scheduler: str, performance_directory: str, 
                 custom_optim_setup: bool = False, checkpoint: Optional[str] = None) -> None:
+
+    """
+    A function for setting up the optimization parameters like learning rate. Also 
+    sets up Learning rate scheduler parameters like factor, threshold, patience etc.
+
+    Args:
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+    optimizer (str): The name of the optimizer. Choose between ('adam', 'SGD')
+    scheduler (str): The name of the scheduler. Choose between ('StepLR', 'reduceOnPlateau')
+    custom_optim_setup (bool): A boolean specifying whether to use a custom, user-input setup
+                                for optimization or to load from some desired checkpoint.
+    checkpoint (str): Path of the checkpoint desired to be loaded. The hyperparameters for this
+                        checkpoint will be read from the correspoiding Text file.
+
+    Returns:
+    None.
+
+    """
+
     if custom_optim_setup:
         lr = round(float(input("Enter Learning rate:\n>>>>")), 3)
         f = round(float(input("Enter the Factor for reduceOnPlateau scheduler \
@@ -151,7 +282,7 @@ def setup_opt(Model, optimizer: str, scheduler: str, performance_directory: str,
                                 threshold=t, patience=p, step_size=s, gamma=g)
 
 
-# Training process
+
 def train(Model, 
         optimizer: str, 
         scheduler: str, 
@@ -161,7 +292,26 @@ def train(Model,
         load_from_checkpoint: bool = False, 
         custom_optim_setup: bool = True) -> None:
 
-    
+    """
+    A function for setting up the Training method of the class Classifier.
+
+    Args:
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+    optimizer (str): The name of the optimizer. Choose between ('adam', 'SGD')
+    scheduler (str): The name of the scheduler. Choose between ('StepLR', 'reduceOnPlateau')
+    n_epochs (int): Number of epochs to train
+    custom_path_bool (bool): Specifies whether to load a custom, user-input checkpoint or
+                            from a previous checkpoint.
+    load_from_checkpoint (bool): Specifies whether to load a custom, user-input checkpoint or
+                            from a previous checkpoint.
+    custom_optim_setup (bool): A boolean specifying whether to use a custom, user-input setup
+                                for optimization or to load from some desired checkpoint.
+
+    Returns:
+    None.
+
+    """
+
     if custom_path_bool and load_from_checkpoint:
         delete_file(Model, stats_delete=False)
         raise RuntimeError("load_prev should be False when Custom path is given and Vice Versa.")
@@ -211,23 +361,34 @@ def train(Model,
     Model.train(n_epochs, custom_path, load_prev=checkpoint, valid_loss=valid_loss)
 
 
+
 def delete_file(Model, stats_delete=True):
+
+    """
+    A function to delete the text file and model stats (tensorboard) if an error occurs and
+    training could not be completed. Incomplete text files are not desirable.
+
+    Args:
+    Model (Classifier): The object of the class 'Classifier' instantiated before.
+    stats_delete (bool): A boolean specifying whether to delete the model stats for tensorboard.
+                        Default False since a Model stats file may not be generated while
+                        attempting to delete text file.
+
+    Returns:
+    None.
+
+    """
 
     exp_no = Model.exp_no
     Model.delete_file(exp_no, stats_delete)
 
 
+
 if __name__ == "__main__":
     
-    # Experimentation Controls
-    #### Primary controls
-    #If True, the module will load the last experiment's learning rate and 
-    # other parameters of optmization and lr scheduler
-    custom_optim_setup = False 
-    #If True, module will load from checkpoint created by last experiment
-    load_from_checkpoint = False
-    #If True, model will begin training from a checkpoint saved at a custom path 
-    # (or any desired checkpoint)
+    ####################### --- Control Variables --- #########################
+    custom_optim_setup = True 
+    load_from_checkpoint = True
     custom_path_bool = False
     Num_epochs = 10
     Model_to_train = 'resnet18'
@@ -235,24 +396,15 @@ if __name__ == "__main__":
     features_in_fc_layers = [128]
     optimizer = 'SGD'
     scheduler = 'reduceOnPlateau'
-    #### Secondary controls
-    #If True, Plots images with predicted names and actual names as plot titles
     want_to_visualize = False
-    #If True, plots image on left hand side and histogram of class probabilities on right
     class_histogram_plot = False
-    #If True, saves the whole model so as to use for inference 
-    # (Enabled after reaching satisfactory performance)
     wish_to_save = True
-
-
-    # Down below is a data set directory
     dataset_dir = 'C:\\Users\\soham\\Desktop\\ME781_project\\Code\\Animal_dataV2'
-    #data_dir = 'C:\\Users\\soham\\Desktop\\ME781_project\\Code\\Animal10'
-    
-    # Directory where all the info of the experiment is stored
     performance_directory = 'C:\\Users\\soham\\Desktop\\ME781_project\\Summary'
 
+    
     gpu = get_gpu_status()
+
     classifier = instantiate_model(Model_to_train, dataset_dir, performance_directory, gpu=gpu)
     load_data(classifier, num_fcl, features_in_fc_layers)
 
